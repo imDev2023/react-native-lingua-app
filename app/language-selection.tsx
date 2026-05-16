@@ -13,15 +13,20 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { languages } from '@/data/languages';
 import { images } from '@/constants/images';
+import { useLanguageStore } from '@/store/languageStore';
 
 const LEARNER_COUNTS: Record<string, string> = {
   es: '28.4M',
   fr: '19.4M',
   de: '8.1M',
+  ja: '12.7M',
+  ko: '9.3M',
+  zh: '7.4M',
 };
 
 export default function LanguageSelection() {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const { selectedLanguageId, setSelectedLanguage } = useLanguageStore();
+  const [selectedId, setSelectedId] = useState<string | null>(selectedLanguageId);
   const [search, setSearch] = useState('');
 
   const filtered = languages.filter(
@@ -33,7 +38,7 @@ export default function LanguageSelection() {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       {/* Header */}
-      <View className="flex-row items-center px-4 pt-2 pb-3">
+      <View className="flex-row items-center px-4 pt-2 pb-2">
         <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7}>
           <Ionicons name="chevron-back" size={24} color="#001132" />
         </TouchableOpacity>
@@ -45,7 +50,7 @@ export default function LanguageSelection() {
       </View>
 
       {/* Search bar */}
-      <View className="px-4 mb-4">
+      <View className="px-4 mb-2">
         <View style={styles.searchContainer}>
           <Ionicons name="search" size={18} color="#9CA3AF" />
           <TextInput
@@ -58,13 +63,13 @@ export default function LanguageSelection() {
         </View>
       </View>
 
-      {/* Language list */}
+      {/* Language list + Continue button */}
       <ScrollView
         style={{ flex: 1 }}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 8 }}
+        contentContainerStyle={{ paddingBottom: 4 }}
       >
-        <Text className="px-4 mb-3 font-poppins-semibold text-text-primary text-sm">
+        <Text className="px-4 mb-1 font-poppins-semibold text-text-primary text-sm">
           Popular
         </Text>
 
@@ -99,11 +104,9 @@ export default function LanguageSelection() {
             </TouchableOpacity>
           );
         })}
-      </ScrollView>
 
-      {/* Continue button + earth illustration */}
-      <View>
-        <View className="px-4 pt-2 pb-4">
+        {/* Continue sits right below the last card */}
+        <View className="px-4 pt-3 pb-1">
           <TouchableOpacity
             style={[
               styles.continueBtn,
@@ -111,15 +114,22 @@ export default function LanguageSelection() {
             ]}
             activeOpacity={0.85}
             disabled={!selectedId}
-            onPress={() => router.back()}
+            onPress={() => {
+                if (selectedId) {
+                  setSelectedLanguage(selectedId);
+                  router.replace('/');
+                }
+              }}
           >
             <Text className="font-poppins-semibold text-white text-base">
               Continue
             </Text>
           </TouchableOpacity>
         </View>
-        <Image source={images.earth} style={styles.earthImage} resizeMode="contain" />
-      </View>
+      </ScrollView>
+
+      {/* Earth illustration — fixed height below the scroll area */}
+      <Image source={images.earth} style={styles.earthImage} resizeMode="contain" />
     </SafeAreaView>
   );
 }
@@ -135,7 +145,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F6F7FB',
     borderRadius: 16,
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingVertical: 10,
   },
   searchInput: {
     flex: 1,
@@ -148,9 +158,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginHorizontal: 16,
-    marginBottom: 10,
+    marginBottom: 7,
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 10,
     borderRadius: 16,
     borderWidth: 1.5,
     borderColor: '#E5E7EB',
@@ -161,14 +171,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F2FF',
   },
   flag: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
   },
   checkCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     backgroundColor: '#6C4EF5',
     alignItems: 'center',
     justifyContent: 'center',
@@ -176,7 +186,7 @@ const styles = StyleSheet.create({
   continueBtn: {
     backgroundColor: '#6C4EF5',
     borderRadius: 16,
-    paddingVertical: 16,
+    paddingVertical: 13,
     alignItems: 'center',
   },
   continueBtnDisabled: {
@@ -184,6 +194,6 @@ const styles = StyleSheet.create({
   },
   earthImage: {
     width: '100%',
-    height: 170,
+    height: 160,
   },
 });

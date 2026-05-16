@@ -5,7 +5,8 @@ import { tokenCache } from "@clerk/expo/token-cache";
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
+import { useLanguageStore } from "@/store/languageStore";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -17,20 +18,22 @@ if (!publishableKey) {
 
 function RootNavigator({ fontsLoaded }: { fontsLoaded: boolean }) {
   const { isLoaded, isSignedIn } = useAuth();
+  const { _hasHydrated } = useLanguageStore();
+  const splashHidden = useRef(false);
 
-  // Keep the native splash visible until fonts AND Clerk's session are ready.
-  // The guard re-evaluation below then happens behind the splash, so there is
-  // no flash of the wrong route.
+  // Keep splash visible until fonts, Clerk session, and store hydration are all ready.
+  // Guard with a ref so hideAsync is only ever called once.
   useEffect(() => {
-    if (fontsLoaded && isLoaded) {
+    if (fontsLoaded && isLoaded && _hasHydrated && !splashHidden.current) {
+      splashHidden.current = true;
       SplashScreen.hideAsync().catch(() => {});
     }
-  }, [fontsLoaded, isLoaded]);
+  }, [fontsLoaded, isLoaded, _hasHydrated]);
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Protected guard={!!isSignedIn}>
-        <Stack.Screen name="index" />
+        <Stack.Screen name="(tabs)" />
         <Stack.Screen name="language-selection" />
         <Stack.Screen name="tasks/[key]" />
       </Stack.Protected>
