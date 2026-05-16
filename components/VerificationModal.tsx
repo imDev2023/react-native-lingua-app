@@ -49,6 +49,7 @@ export default function VerificationModal({
         err instanceof Error ? err.message : "Invalid code. Please try again.";
       setError(message);
       setCode("");
+    } finally {
       setVerifying(false);
     }
   };
@@ -75,7 +76,7 @@ export default function VerificationModal({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="fade">
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}

@@ -36,14 +36,30 @@ export function useSocialAuth() {
       setPending(strategy);
       setError(null);
       try {
-        const { createdSessionId, setActive } = await startSSOFlow({
-          strategy,
-          redirectUrl: AuthSession.makeRedirectUri(),
-        });
+        const { createdSessionId, setActive, signIn, signUp, authSessionResult } =
+          await startSSOFlow({
+            strategy,
+            redirectUrl: AuthSession.makeRedirectUri(),
+          });
 
         if (createdSessionId && setActive) {
           await setActive({ session: createdSessionId });
           router.replace("/");
+        } else if (
+          authSessionResult?.type === "cancel" ||
+          authSessionResult?.type === "dismiss"
+        ) {
+          // User closed the browser without completing — no error needed.
+        } else if (signIn?.status === "needs_second_factor") {
+          setError(
+            "Two-factor authentication is required. Please sign in with email and password.",
+          );
+        } else if (signUp?.status === "missing_requirements") {
+          setError(
+            "Additional information is required to complete sign-up. Please use email and password.",
+          );
+        } else if (signIn || signUp) {
+          setError("Sign-in could not be completed. Please try again.");
         }
       } catch (err) {
         console.error(

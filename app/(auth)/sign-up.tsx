@@ -60,8 +60,11 @@ export default function SignUpScreen() {
     if (signUp.status === "complete") {
       await signUp.finalize({
         navigate: ({ session }) => {
-          if (session?.currentTask) return;
           setModalVisible(false);
+          if (session?.currentTask) {
+            router.replace(`/tasks/${session.currentTask.key}` as Href);
+            return;
+          }
           router.replace("/" as Href);
         },
       });
