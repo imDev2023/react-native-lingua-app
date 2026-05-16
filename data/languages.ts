@@ -29,6 +29,30 @@ export const languages: Language[] = [
     description: 'The most widely spoken language in the European Union.',
     available: true,
   },
+  {
+    id: 'ja',
+    name: 'Japanese',
+    nativeName: '日本語',
+    flag: 'https://flagcdn.com/w320/jp.png',
+    description: 'A fascinating language with three writing systems.',
+    available: true,
+  },
+  {
+    id: 'ko',
+    name: 'Korean',
+    nativeName: '한국어',
+    flag: 'https://flagcdn.com/w320/kr.png',
+    description: 'A logical language with a unique and elegant alphabet.',
+    available: true,
+  },
+  {
+    id: 'zh',
+    name: 'Chinese',
+    nativeName: '普通话',
+    flag: 'https://flagcdn.com/w320/cn.png',
+    description: 'The most spoken language in the world by native speakers.',
+    available: true,
+  },
 ];
 
 /** Find a language by its code. Returns `undefined` if it does not exist. */

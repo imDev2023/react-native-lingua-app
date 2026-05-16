@@ -11,7 +11,7 @@
  */
 
 /** ISO 639-1 codes for the languages this app currently supports. */
-export type LanguageCode = 'es' | 'fr' | 'de';
+export type LanguageCode = 'es' | 'fr' | 'de' | 'ja' | 'ko' | 'zh';
 
 /** Codes used when describing translation direction (target language or English). */
 export type TranslationLang = LanguageCode | 'en';
