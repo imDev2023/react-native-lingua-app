@@ -1,0 +1,116 @@
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/preflight.css" layer(base);
+@import "tailwindcss/utilities.css";
+
+@import "nativewind/theme";
+
+@theme {
+  /* ── Primary brand colors ── */
+  --color-lingua-purple: #6C4EF5;
+  --color-primary-deep-purple: #5B3BF6;
+  --color-lingua-blue: #4D88FF;
+  --color-lingua-green: #21C16B;
+
+  /* ── Semantic colors ── */
+  --color-success: #21C16B;
+  --color-warning: #FFCB00;
+  --color-streak: #FF8A00;
+  --color-error: #FF4D4F;
+  --color-info: #4D88FF;
+
+  /* ── Neutral colors ── */
+  --color-text-primary: #001328;
+  --color-text-secondary: #6B7280;
+  --color-border: #E5E7EB;
+  --color-surface: #F6F7FB;
+  --color-background: #ffffff;
+
+  /* ── Font families ── */
+  --font-sans: "Poppins-Regular";
+  --font-poppins: "Poppins-Regular";
+  --font-poppins-medium: "Poppins-Medium";
+  --font-poppins-semibold: "Poppins-SemiBold";
+  --font-poppins-bold: "Poppins-Bold";
+
+  /* ── Font sizes ── */
+  --h1: 32px;
+  --h2: 24px;
+  --h3: 20px;
+  --h4: 16px;
+  --body-lg: 16px;
+  --body-md: 14px;
+  --body-sm: 13px;
+  --caption: 11px;
+}
+
+/* ──────────────────────────────────────────────
+   Typography utilities — BEM (Block: text)
+   Absolute line-heights keep React Native happy.
+   ────────────────────────────────────────────── */
+@layer utilities {
+  /* Headings */
+  .h1 {
+    font-size: 32px;
+    line-height: 38px;
+    font-family: "Poppins-Bold";
+    font-weight: 700;
+    color: #001132;
+  }
+
+  .h2 {
+    font-size: 24px;
+    line-height: 31px;
+    font-family: "Poppins-SemiBold";
+    font-weight: 600;
+    color: #001132;
+  }
+
+  .h3 {
+    font-size: 20px;
+    line-height: 26px;
+    font-family: "Poppins-SemiBold";
+    font-weight: 600;
+    color: #001132;
+  }
+
+  .h4 {
+    font-size: 16px;
+    line-height: 22px;
+    font-family: "Poppins-Medium";
+    font-weight: 500;
+    color: #001132;
+  }
+
+  /* Body */
+  .body-lg {
+    font-size: 16px;
+    line-height: 26px;
+    font-family: "Poppins-Regular";
+    font-weight: 400;
+    color: #001132;
+  }
+
+  .body-md {
+    font-size: 14px;
+    line-height: 22px;
+    font-family: "Poppins-Regular";
+    font-weight: 400;
+    color: #001132;
+  }
+
+  .body-sm {
+    font-size: 13px;
+    line-height: 21px;
+    font-family: "Poppins-Regular";
+    font-weight: 400;
+    color: #001132;
+  }
+
+  .caption {
+    font-size: 11px;
+    line-height: 15px;
+    font-family: "Poppins-Regular";
+    font-weight: 400;
+    color: #6B7280;
+  }
+}
