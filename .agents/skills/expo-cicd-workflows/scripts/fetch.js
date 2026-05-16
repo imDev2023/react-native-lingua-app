@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import process from 'node:process';
+import { fileURLToPath } from 'node:url';
 
 const CACHE_DIRECTORY = resolve(import.meta.dirname, '.cache');
 const DEFAULT_TTL_SECONDS = 15 * 60; // 15 minutes
@@ -92,7 +93,7 @@ function parseMaxAge(cacheControl) {
   return match ? parseInt(match[1], 10) : null;
 }
 
-if (import.meta.main) {
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const url = process.argv[2];
 
   if (!url || url === '--help' || url === '-h') {
