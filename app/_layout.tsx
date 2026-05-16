@@ -3,11 +3,11 @@ import "../global.css";
 import { ClerkProvider, useAuth } from "@clerk/expo";
 import { tokenCache } from "@clerk/expo/token-cache";
 import { useFonts } from "expo-font";
-import { Stack, useRouter, useSegments } from "expo-router";
+import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 
-SplashScreen.preventAutoHideAsync();
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
 
@@ -15,39 +15,30 @@ if (!publishableKey) {
   throw new Error("Add EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY to your .env.local file");
 }
 
-function InitialLayout({ fontsLoaded }: { fontsLoaded: boolean }) {
+function RootNavigator({ fontsLoaded }: { fontsLoaded: boolean }) {
   const { isLoaded, isSignedIn } = useAuth();
-  const segments = useSegments();
-  const router = useRouter();
 
-  const ready = fontsLoaded && isLoaded;
-
+  // Keep the native splash visible until fonts AND Clerk's session are ready.
+  // The guard re-evaluation below then happens behind the splash, so there is
+  // no flash of the wrong route.
   useEffect(() => {
-    if (ready) {
-      SplashScreen.hideAsync();
+    if (fontsLoaded && isLoaded) {
+      SplashScreen.hideAsync().catch(() => {});
     }
-  }, [ready]);
+  }, [fontsLoaded, isLoaded]);
 
-  useEffect(() => {
-    if (!ready) return;
+  return (
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Protected guard={!!isSignedIn}>
+        <Stack.Screen name="index" />
+      </Stack.Protected>
 
-    const inAuthGroup = segments[0] === "(auth)";
-    const onOnboarding = segments[0] === "onboarding";
-
-    if (isSignedIn && (inAuthGroup || onOnboarding)) {
-      // Authenticated users always land on the home route
-      router.replace("/");
-    } else if (!isSignedIn && !inAuthGroup && !onOnboarding) {
-      // Unauthenticated users see onboarding before they can reach home
-      router.replace("/onboarding");
-    }
-  }, [ready, isSignedIn, segments, router]);
-
-  if (!ready) {
-    return null;
-  }
-
-  return <Stack screenOptions={{ headerShown: false }} />;
+      <Stack.Protected guard={!isSignedIn}>
+        <Stack.Screen name="onboarding" />
+        <Stack.Screen name="(auth)" />
+      </Stack.Protected>
+    </Stack>
+  );
 }
 
 export default function RootLayout() {
@@ -60,7 +51,7 @@ export default function RootLayout() {
 
   return (
     <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
-      <InitialLayout fontsLoaded={fontsLoaded} />
+      <RootNavigator fontsLoaded={fontsLoaded} />
     </ClerkProvider>
   );
 }
