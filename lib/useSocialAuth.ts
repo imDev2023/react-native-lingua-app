@@ -46,8 +46,8 @@ export function useSocialAuth() {
           });
 
         if (createdSessionId && setActive) {
-          posthog.capture('social_auth_completed', { provider: strategy });
           await setActive({ session: createdSessionId });
+          posthog.capture('social_auth_completed', { provider: strategy });
           router.replace("/");
         } else if (
           authSessionResult?.type === "cancel" ||
