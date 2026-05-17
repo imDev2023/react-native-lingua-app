@@ -50,8 +50,8 @@ export default function CustomTabBar({ state, descriptors, navigation }: BottomT
 
   const handleLayout = (e: LayoutChangeEvent) => {
     const totalWidth = e.nativeEvent.layout.width;
-    const tw = totalWidth / TABS.length;
-    setTabWidth(tw);
+    const count = state.routes.length || 1;
+    setTabWidth(totalWidth / count);
   };
 
   return (

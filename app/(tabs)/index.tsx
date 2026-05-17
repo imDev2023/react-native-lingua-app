@@ -3,6 +3,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useUser } from "@clerk/expo";
 import { Redirect } from "expo-router";
+import { usePostHog } from "posthog-react-native";
 import { useLanguageStore } from "@/store/languageStore";
 import { useProgressStore } from "@/store/progressStore";
 import { getLanguageById } from "@/data/languages";
@@ -34,6 +35,7 @@ export default function HomeScreen() {
   const { selectedLanguageId, _hasHydrated } = useLanguageStore();
   const { streakCount, dailyXp, dailyXpGoal, completedLessonIds } = useProgressStore();
   const { user } = useUser();
+  const posthog = usePostHog();
 
   if (!_hasHydrated) return null;
   if (!selectedLanguageId) return <Redirect href="/language-selection" />;
@@ -146,6 +148,11 @@ export default function HomeScreen() {
               <TouchableOpacity
                 className="bg-white rounded-3xl py-2 px-5 self-start"
                 activeOpacity={0.85}
+                testID="continue-learning-button"
+                onPress={() => posthog.capture('continue_learning_tapped', {
+                  language_id: selectedLanguageId,
+                  unit_order: currentUnit?.order ?? 1,
+                })}
               >
                 <Text className="font-poppins-semibold text-[14px] text-lingua-purple">
                   Continue
@@ -162,7 +169,7 @@ export default function HomeScreen() {
           <View>
             <View className="flex-row items-center justify-between mb-3">
               <Text className="font-poppins-semibold text-base text-text-primary">
-                Today's plan
+                Today&apos;s plan
               </Text>
               <TouchableOpacity activeOpacity={0.7}>
                 <Text className="font-poppins-medium text-[14px] text-lingua-purple">

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { usePostHog } from 'posthog-react-native';
 import { languages } from '@/data/languages';
 import { images } from '@/constants/images';
 import { useLanguageStore } from '@/store/languageStore';
@@ -26,8 +27,13 @@ const LEARNER_COUNTS: Record<string, string> = {
 
 export default function LanguageSelection() {
   const { selectedLanguageId, setSelectedLanguage } = useLanguageStore();
+  const posthog = usePostHog();
   const [selectedId, setSelectedId] = useState<string | null>(selectedLanguageId);
   const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    setSelectedId(selectedLanguageId);
+  }, [selectedLanguageId]);
 
   const filtered = languages.filter(
     (lang) =>
@@ -80,7 +86,13 @@ export default function LanguageSelection() {
               key={language.id}
               style={[styles.card, isSelected && styles.cardSelected]}
               activeOpacity={0.7}
-              onPress={() => setSelectedId(language.id)}
+              onPress={() => {
+                setSelectedId(language.id);
+                posthog.capture('language_selected', {
+                  language_id: language.id,
+                  language_name: language.name,
+                });
+              }}
             >
               <Image source={{ uri: language.flag }} style={styles.flag} />
               <View className="flex-1 ml-3">
@@ -116,6 +128,11 @@ export default function LanguageSelection() {
             disabled={!selectedId}
             onPress={() => {
                 if (selectedId) {
+                  const lang = languages.find((l) => l.id === selectedId);
+                  posthog.capture('language_confirmed', {
+                    language_id: selectedId,
+                    language_name: lang?.name,
+                  });
                   setSelectedLanguage(selectedId);
                   router.replace('/');
                 }

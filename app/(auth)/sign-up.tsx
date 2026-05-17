@@ -12,6 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { router, type Href } from "expo-router";
 import { useSignUp } from "@clerk/expo";
 import { AntDesign, FontAwesome, Ionicons } from "@expo/vector-icons";
+import { usePostHog } from "posthog-react-native";
 import { images } from "@/constants/images";
 import VerificationModal from "@/components/VerificationModal";
 import { useSocialAuth } from "@/lib/useSocialAuth";
@@ -19,6 +20,7 @@ import { useSocialAuth } from "@/lib/useSocialAuth";
 export default function SignUpScreen() {
   const { signUp, fetchStatus } = useSignUp();
   const { onSocialPress, pending: socialPending } = useSocialAuth();
+  const posthog = usePostHog();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -31,6 +33,8 @@ export default function SignUpScreen() {
   const handleSignUp = async () => {
     if (!email || !password || submitting) return;
     setFormError(null);
+
+    posthog.capture('sign_up_submitted', { method: 'email' });
 
     const { error } = await signUp.password({
       emailAddress: email,
@@ -60,6 +64,11 @@ export default function SignUpScreen() {
     if (signUp.status === "complete") {
       await signUp.finalize({
         navigate: ({ session }) => {
+          posthog.capture('sign_up_completed', { method: 'email' });
+          posthog.identify(email, {
+            $set: { email },
+            $set_once: { first_sign_up_date: new Date().toISOString() },
+          });
           setModalVisible(false);
           if (session?.currentTask) {
             router.replace(`/tasks/${session.currentTask.key}` as Href);
