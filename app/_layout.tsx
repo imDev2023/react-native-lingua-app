@@ -38,9 +38,13 @@ function RootNavigator({ fontsLoaded }: { fontsLoaded: boolean }) {
   // Manual screen tracking for Expo Router
   useEffect(() => {
     if (previousPathname.current !== pathname) {
+      const SENSITIVE_PARAMS = new Set(["code", "state", "token", "session_id"]);
+      const filteredParams = Object.fromEntries(
+        Object.entries(params).filter(([key]) => !SENSITIVE_PARAMS.has(key))
+      );
       posthog.screen(pathname, {
         previous_screen: previousPathname.current ?? null,
-        ...params,
+        ...filteredParams,
       });
       previousPathname.current = pathname;
     }
