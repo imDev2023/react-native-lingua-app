@@ -3,10 +3,12 @@ import "../global.css";
 import { ClerkProvider, useAuth } from "@clerk/expo";
 import { tokenCache } from "@clerk/expo/token-cache";
 import { useFonts } from "expo-font";
-import { Stack } from "expo-router";
+import { Stack, usePathname, useGlobalSearchParams } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect, useRef } from "react";
+import { PostHogProvider } from "posthog-react-native";
 import { useLanguageStore } from "@/store/languageStore";
+import { posthog } from "@/lib/posthog";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -20,6 +22,9 @@ function RootNavigator({ fontsLoaded }: { fontsLoaded: boolean }) {
   const { isLoaded, isSignedIn } = useAuth();
   const { _hasHydrated } = useLanguageStore();
   const splashHidden = useRef(false);
+  const pathname = usePathname();
+  const params = useGlobalSearchParams();
+  const previousPathname = useRef<string | undefined>(undefined);
 
   // Keep splash visible until fonts, Clerk session, and store hydration are all ready.
   // Guard with a ref so hideAsync is only ever called once.
@@ -29,6 +34,17 @@ function RootNavigator({ fontsLoaded }: { fontsLoaded: boolean }) {
       SplashScreen.hideAsync().catch(() => {});
     }
   }, [fontsLoaded, isLoaded, _hasHydrated]);
+
+  // Manual screen tracking for Expo Router
+  useEffect(() => {
+    if (previousPathname.current !== pathname) {
+      posthog.screen(pathname, {
+        previous_screen: previousPathname.current ?? null,
+        ...params,
+      });
+      previousPathname.current = pathname;
+    }
+  }, [pathname, params]);
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
@@ -55,8 +71,17 @@ export default function RootLayout() {
   });
 
   return (
-    <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
-      <RootNavigator fontsLoaded={fontsLoaded} />
-    </ClerkProvider>
+    <PostHogProvider
+      client={posthog}
+      autocapture={{
+        captureScreens: false,
+        captureTouches: true,
+        propsToCapture: ['testID'],
+      }}
+    >
+      <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
+        <RootNavigator fontsLoaded={fontsLoaded} />
+      </ClerkProvider>
+    </PostHogProvider>
   );
 }

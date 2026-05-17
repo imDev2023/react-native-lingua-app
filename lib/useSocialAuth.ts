@@ -3,6 +3,7 @@ import * as AuthSession from "expo-auth-session";
 import { useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { useCallback, useEffect, useState } from "react";
+import { usePostHog } from "posthog-react-native";
 
 // Required so the auth session can complete when the user returns to the app.
 WebBrowser.maybeCompleteAuthSession();
@@ -19,6 +20,7 @@ export type SocialStrategy =
 export function useSocialAuth() {
   const { startSSOFlow } = useSSO();
   const router = useRouter();
+  const posthog = usePostHog();
   const [pending, setPending] = useState<SocialStrategy | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,6 +37,7 @@ export function useSocialAuth() {
       if (pending) return;
       setPending(strategy);
       setError(null);
+      posthog.capture('social_auth_started', { provider: strategy });
       try {
         const { createdSessionId, setActive, signIn, signUp, authSessionResult } =
           await startSSOFlow({
@@ -43,6 +46,7 @@ export function useSocialAuth() {
           });
 
         if (createdSessionId && setActive) {
+          posthog.capture('social_auth_completed', { provider: strategy });
           await setActive({ session: createdSessionId });
           router.replace("/");
         } else if (
@@ -71,7 +75,7 @@ export function useSocialAuth() {
         setPending(null);
       }
     },
-    [pending, startSSOFlow, router],
+    [pending, startSSOFlow, router, posthog],
   );
 
   return { onSocialPress, pending, error };

@@ -12,12 +12,14 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { router, type Href } from "expo-router";
 import { useSignIn } from "@clerk/expo";
 import { AntDesign, FontAwesome, Ionicons } from "@expo/vector-icons";
+import { usePostHog } from "posthog-react-native";
 import { images } from "@/constants/images";
 import { useSocialAuth } from "@/lib/useSocialAuth";
 
 export default function SignInScreen() {
   const { signIn, fetchStatus } = useSignIn();
   const { onSocialPress, pending: socialPending } = useSocialAuth();
+  const posthog = usePostHog();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -29,6 +31,8 @@ export default function SignInScreen() {
   const handleSignIn = async () => {
     if (!email || !password || submitting) return;
     setFormError(null);
+
+    posthog.capture('sign_in_submitted', { method: 'email' });
 
     const { error } = await signIn.password({
       emailAddress: email,
@@ -43,6 +47,10 @@ export default function SignInScreen() {
     if (signIn.status === "complete") {
       await signIn.finalize({
         navigate: ({ session }) => {
+          posthog.capture('sign_in_completed', { method: 'email' });
+          posthog.identify(email, {
+            $set: { email },
+          });
           if (session?.currentTask) return;
           router.replace("/" as Href);
         },

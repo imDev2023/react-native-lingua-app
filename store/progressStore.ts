@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
+import { posthog } from '@/lib/posthog';
 
 interface ProgressStore {
   streakCount: number;
@@ -23,15 +24,17 @@ export const useProgressStore = create<ProgressStore>()(
       completedLessonIds: [],
       _hasHydrated: false,
       addXp: (amount) =>
-        set((state) => ({
-          dailyXp: Math.min(state.dailyXp + amount, state.dailyXpGoal),
-        })),
+        set((state) => {
+          const newXp = Math.min(state.dailyXp + amount, state.dailyXpGoal);
+          posthog.capture('xp_earned', { xp_amount: amount, total_xp: newXp });
+          return { dailyXp: newXp };
+        }),
       completeLesson: (lessonId) =>
-        set((state) => ({
-          completedLessonIds: state.completedLessonIds.includes(lessonId)
-            ? state.completedLessonIds
-            : [...state.completedLessonIds, lessonId],
-        })),
+        set((state) => {
+          if (state.completedLessonIds.includes(lessonId)) return state;
+          posthog.capture('lesson_completed', { lesson_id: lessonId });
+          return { completedLessonIds: [...state.completedLessonIds, lessonId] };
+        }),
       incrementStreak: () =>
         set((state) => ({ streakCount: state.streakCount + 1 })),
       setHasHydrated: (value) => set({ _hasHydrated: value }),
