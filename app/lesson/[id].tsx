@@ -326,7 +326,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-around",
     paddingHorizontal: 16,
-    marginBottom: 36,
+    marginBottom: 16,
   },
   statItem: {
     alignItems: "center",
