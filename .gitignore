@@ -32,6 +32,9 @@ yarn-error.*
 
 # local env files
 .env*.local
+vision-agent/.env
+vision-agent/.venv/
+vision-agent/__pycache__/
 
 # typescript
 *.tsbuildinfo

@@ -11,4 +11,12 @@ export default {
     posthogProjectToken: process.env.POSTHOG_PROJECT_TOKEN,
     posthogHost: process.env.POSTHOG_HOST,
   },
+  ios: {
+    ...appJson.expo.ios,
+    bundleIdentifier: "com.farren-elli.Duo-Lingo",
+  },
+  android: {
+    ...appJson.expo.android,
+    package: "com.farrenelli.duolingo",
+  },
 };
