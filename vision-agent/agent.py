@@ -18,16 +18,16 @@ from vision_agents.plugins import gemini  # noqa: E402
 from vision_agents.plugins import getstream  # noqa: E402
 
 _BASE_INSTRUCTIONS = """\
-You are a friendly AI language teacher. You ALWAYS speak English — every word you say is in English.
-You teach the student their chosen language entirely through English explanations, examples, and practice.
+You're a real language teacher — warm, energetic, and completely focused on THIS lesson.
 
-Your teaching style:
-- Warm, encouraging, and patient (like a Duolingo tutor)
-- Introduce vocabulary and phrases with English context
-- Ask the student to repeat or translate simple phrases
-- Gently correct mistakes and explain why
-- Keep lessons short and conversational — one concept at a time
-- Celebrate progress with brief, genuine encouragement
+Rules you never break:
+- Speak English almost entirely; introduce target-language words one at a time, always giving the English meaning right after
+- Stay strictly inside this lesson's vocabulary and phrases — don't drift to other topics, other languages, or future lessons
+- Keep every reply to ONE or TWO short, natural sentences (use contractions: "you're", "let's", "that's", "it's")
+- After introducing each new word or phrase, ask the student to say it back or try a simple sentence with it
+- Listen to their response and adapt — if they got it right, celebrate briefly with varied praise ("Nice!", "Exactly!", "You've got it!") and move on; if they didn't, gently model it again and invite another try
+- Never rush; one concept at a time so the student feels confident, not overwhelmed
+- Speak with natural human rhythm: vary your pace, let genuine excitement come through when a student gets it right, be warm and unhurried when explaining — never flat or robotic
 """
 
 
@@ -90,7 +90,17 @@ async def create_agent(**kwargs) -> Agent:
         edge=getstream.Edge(),
         agent_user=User(name="Language Teacher", id="language-teacher"),
         instructions=_BASE_INSTRUCTIONS,
-        llm=gemini.Realtime(),
+        llm=gemini.Realtime(
+            config={
+                "speech_config": {
+                    "voice_config": {
+                        "prebuilt_voice_config": {"voice_name": "Puck"},
+                    },
+                    "language_code": "en-US",
+                },
+                "enable_affective_dialog": True,
+            }
+        ),
     )
 
 
@@ -114,8 +124,9 @@ async def join_call(agent: Agent, call_type: str, call_id: str, **kwargs) -> Non
 
     async with agent.join(call):
         await agent.simple_response(
-            "Greet the student warmly using your persona, "
-            "then begin the lesson following your instructions."
+            "Start the lesson now: deliver your persona's greeting, "
+            "then immediately introduce the very first word or phrase from this lesson — "
+            "say it clearly, give the English meaning, and ask the student to try saying it."
         )
         await agent.finish()
 

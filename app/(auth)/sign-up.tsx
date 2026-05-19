@@ -16,11 +16,13 @@ import { usePostHog } from "posthog-react-native";
 import { images } from "@/constants/images";
 import VerificationModal from "@/components/VerificationModal";
 import { useSocialAuth } from "@/lib/useSocialAuth";
+import { useLanguageStore } from "@/store/languageStore";
 
 export default function SignUpScreen() {
   const { signUp, fetchStatus } = useSignUp();
   const { onSocialPress, pending: socialPending } = useSocialAuth();
   const posthog = usePostHog();
+  const { selectedLanguageId } = useLanguageStore();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -65,9 +67,9 @@ export default function SignUpScreen() {
       await signUp.finalize({
         navigate: ({ session }) => {
           posthog.capture('sign_up_completed', { method: 'email' });
-          posthog.identify(email, {
-            $set: { email },
-            $set_once: { first_sign_up_date: new Date().toISOString() },
+          posthog.identify(session?.userId ?? email, {
+            $set: { email, preferred_language: selectedLanguageId },
+            $set_once: { signup_date: new Date().toISOString() },
           });
           setModalVisible(false);
           if (session?.currentTask) {
