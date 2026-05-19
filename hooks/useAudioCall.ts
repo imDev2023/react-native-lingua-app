@@ -4,7 +4,7 @@ import {
   StreamVideoClient,
   useCallStateHooks,
 } from "@stream-io/video-react-native-sdk";
-import { useUser } from "@clerk/expo";
+import { useAuth, useUser } from "@clerk/expo";
 import { createStreamClient } from "@/lib/stream";
 
 export type CallStatus =
@@ -26,6 +26,7 @@ interface UseAudioCallOptions {
 }
 
 export function useAudioCall({ lessonId, languageId }: UseAudioCallOptions) {
+  const { getToken } = useAuth();
   const { user } = useUser();
   const [status, setStatus] = useState<CallStatus>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +43,7 @@ export function useAudioCall({ lessonId, languageId }: UseAudioCallOptions) {
       const res = await fetch("/agent/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ callId: callIdRef.current }),
+        body: JSON.stringify({ callId: callIdRef.current, userId: user?.id }),
       });
       if (!res.ok) throw new Error(`Agent start failed: ${res.status}`);
       agentStartedRef.current = true;
@@ -59,7 +60,7 @@ export function useAudioCall({ lessonId, languageId }: UseAudioCallOptions) {
       await fetch("/agent/stop", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ callId: callIdRef.current }),
+        body: JSON.stringify({ callId: callIdRef.current, userId: user?.id }),
       });
     } catch {
       // ignore stop errors
@@ -72,11 +73,15 @@ export function useAudioCall({ lessonId, languageId }: UseAudioCallOptions) {
     setError(null);
 
     try {
-      // Fetch user token from the Expo API route
+      // Fetch Stream token — server verifies the Clerk session and mints the token
+      const clerkToken = await getToken();
+      if (!clerkToken) throw new Error("Not authenticated");
       const tokenRes = await fetch("/token", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user.id }),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${clerkToken}`,
+        },
       });
       if (!tokenRes.ok) throw new Error("Failed to get token");
       const { token } = await tokenRes.json();
@@ -91,16 +96,19 @@ export function useAudioCall({ lessonId, languageId }: UseAudioCallOptions) {
       clientRef.current = client;
 
       // Create/get the call on the server (packs lesson data + adds agent admin)
-      await fetch("/call", {
+      const callRes = await fetch("/call", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({
           callId: callIdRef.current,
-          userId: user.id,
           lessonId,
           languageId,
         }),
       });
+      if (!callRes.ok) throw new Error("Failed to create call");
 
       // Create call instance and join
       const streamCall = client.call("audio_room", callIdRef.current);

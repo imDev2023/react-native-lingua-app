@@ -17,6 +17,6 @@ export default {
   },
   android: {
     ...appJson.expo.android,
-    package: "com.farrenelli.DuoLingo",
+    package: "com.farrenelli.duolingo",
   },
 };

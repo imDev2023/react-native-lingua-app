@@ -62,12 +62,16 @@ def _build_instructions(
 
     if vocabulary:
         vocab_str = ", ".join(
-            f"{v['word']} ({v['translation']})" for v in vocabulary if v.get("word")
+            f"{v.get('word')} ({v.get('translation')})"
+            for v in vocabulary
+            if v.get("word") and v.get("translation")
         )
         lines.append(f"\nVocabulary to cover: {vocab_str}.")
     if phrases:
         phrase_str = ", ".join(
-            f'"{p["text"]}" = {p["translation"]}' for p in phrases if p.get("text")
+            f'"{p.get("text")}" = {p.get("translation")}'
+            for p in phrases
+            if p.get("text") and p.get("translation")
         )
         lines.append(f"Phrases to practice: {phrase_str}.")
 

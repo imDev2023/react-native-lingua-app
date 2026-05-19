@@ -119,12 +119,16 @@ export default function LessonScreen() {
     ? "Great work today! 🎉"
     : shortGreeting;
 
+  const isIdle = status === "idle";
+
   const subText = isJoined
     ? "Session is live — speak naturally!"
     : isConnecting
     ? "Starting audio session…"
     : isError
     ? "Could not start session."
+    : isIdle
+    ? "Tap Start to begin"
     : "That was great! 👋";
 
   const screen = (

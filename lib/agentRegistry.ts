@@ -29,6 +29,7 @@ export function spawnAgent(callId: string): void {
 
   processes.set(callId, child);
   child.on("exit", () => processes.delete(callId));
+  child.on("error", () => processes.delete(callId));
 }
 
 export function killAgent(callId: string): void {
