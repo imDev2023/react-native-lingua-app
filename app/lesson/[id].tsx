@@ -83,6 +83,24 @@ function PushToTalkButton() {
   const ringScale = useRef(new Animated.Value(1)).current;
   const ringOpacity = useRef(new Animated.Value(0)).current;
 
+  const isMountedRef = useRef(true);
+  const pressIdRef = useRef(0);
+  const isListeningRef = useRef(false);
+  const disableMicRef = useRef(disableMic);
+  useEffect(() => { disableMicRef.current = disableMic; }, [disableMic]);
+  useEffect(() => { isListeningRef.current = isListening; }, [isListening]);
+
+  // Unmount cleanup: restore mic and speaker if released while listening
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+      if (isListeningRef.current) {
+        disableMicRef.current().catch(() => {});
+        callManager.speaker.setMute(false);
+      }
+    };
+  }, []);
+
   useEffect(() => {
     if (!isListening) return;
     ringScale.setValue(1);
@@ -101,18 +119,38 @@ function PushToTalkButton() {
     };
   }, [isListening]);
 
-  function handlePressIn() {
-    callManager.speaker.setMute(true); // silence the agent immediately
+  async function handlePressIn() {
+    const pressId = ++pressIdRef.current;
+    callManager.speaker.setMute(true);
     setIsListening(true);
-    enableMic();
     Animated.spring(scale, { toValue: 1.1, useNativeDriver: true, friction: 5 }).start();
+    try {
+      await enableMic();
+      // press-out fired while enableMic was in-flight — undo the enable
+      if (pressIdRef.current !== pressId) {
+        disableMicRef.current().catch(() => {});
+      }
+    } catch {
+      if (isMountedRef.current) {
+        setIsListening(false);
+        callManager.speaker.setMute(false);
+      }
+    }
   }
 
-  function handlePressOut() {
-    disableMic();
-    callManager.speaker.setMute(false); // restore agent audio
-    setIsListening(false);
-    Animated.spring(scale, { toValue: 1, useNativeDriver: true, friction: 5 }).start();
+  async function handlePressOut() {
+    pressIdRef.current++; // invalidate any in-flight pressIn
+    if (isMountedRef.current) {
+      setIsListening(false);
+      Animated.spring(scale, { toValue: 1, useNativeDriver: true, friction: 5 }).start();
+    }
+    try {
+      await disableMic();
+    } catch {
+      // best-effort; finally still restores speaker
+    } finally {
+      callManager.speaker.setMute(false);
+    }
   }
 
   return (
@@ -162,6 +200,20 @@ export default function LessonScreen() {
   const statusRef = useRef(status);
   useEffect(() => { statusRef.current = status; }, [status]);
 
+  // Fire lesson_started only after a successful join, not on button press,
+  // so a failed connection doesn't produce a false lesson_started/abandoned pair.
+  useEffect(() => {
+    if (status === "joined" && !lessonStartedRef.current) {
+      startTimeRef.current = Date.now();
+      lessonStartedRef.current = true;
+      posthog.capture("lesson_started", {
+        lesson_id: id,
+        language: selectedLanguageId ?? lesson?.languageId ?? "en",
+        lesson_number: lesson?.order ?? 1,
+      });
+    }
+  }, [status]);
+
   useEffect(() => {
     return () => {
       if (lessonStartedRef.current && statusRef.current !== "ended") {
@@ -178,13 +230,6 @@ export default function LessonScreen() {
   }, []);
 
   function handleStartLesson() {
-    startTimeRef.current = Date.now();
-    lessonStartedRef.current = true;
-    posthog.capture("lesson_started", {
-      lesson_id: id,
-      language: selectedLanguageId ?? lesson?.languageId ?? "en",
-      lesson_number: lesson?.order ?? 1,
-    });
     startCall();
   }
 

@@ -96,7 +96,8 @@ async def create_agent(**kwargs) -> Agent:
                     "voice_config": {
                         "prebuilt_voice_config": {"voice_name": "Puck"},
                     },
-                    "language_code": "en-US",
+                    # language_code omitted — lessons mix English with target-language
+                    # words, so auto-detection handles multilingual content correctly.
                 },
                 "enable_affective_dialog": True,
             }
