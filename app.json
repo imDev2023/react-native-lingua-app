@@ -41,7 +41,23 @@
       ],
       "@clerk/expo",
       "expo-secure-store",
-      "expo-localization"
+      "expo-localization",
+      "@stream-io/video-react-native-sdk",
+      [
+        "@config-plugins/react-native-webrtc",
+        {
+          "cameraPermission": "$(PRODUCT_NAME) requires camera access to capture video",
+          "microphonePermission": "$(PRODUCT_NAME) requires microphone access for audio lessons"
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 24
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

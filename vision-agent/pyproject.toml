@@ -1,0 +1,15 @@
+[project]
+name = "duo-lingo-voice-teacher"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "vision-agents[getstream,gemini]",
+    "python-dotenv",
+]
+
+# onnxruntime ≥1.26 dropped Intel-Mac wheels; constrain for local dev on macOS x86_64
+[tool.uv]
+package = false
+override-dependencies = [
+    "onnxruntime<=1.23.2",
+]

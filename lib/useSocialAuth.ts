@@ -42,7 +42,7 @@ export function useSocialAuth() {
         const { createdSessionId, setActive, signIn, signUp, authSessionResult } =
           await startSSOFlow({
             strategy,
-            redirectUrl: AuthSession.makeRedirectUri(),
+            redirectUrl: AuthSession.makeRedirectUri({ native: "duolingo://oauth-native-callback" }),
           });
 
         if (createdSessionId && setActive) {
