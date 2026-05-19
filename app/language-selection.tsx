@@ -88,10 +88,6 @@ export default function LanguageSelection() {
               activeOpacity={0.7}
               onPress={() => {
                 setSelectedId(language.id);
-                posthog.capture('language_selected', {
-                  language_id: language.id,
-                  language_name: language.name,
-                });
               }}
             >
               <Image source={{ uri: language.flag }} style={styles.flag} />
@@ -129,9 +125,9 @@ export default function LanguageSelection() {
             onPress={() => {
                 if (selectedId) {
                   const lang = languages.find((l) => l.id === selectedId);
-                  posthog.capture('language_confirmed', {
-                    language_id: selectedId,
-                    language_name: lang?.name,
+                  posthog.capture('language_selected', {
+                    language_code: selectedId,
+                    language_name: lang?.name ?? '',
                   });
                   setSelectedLanguage(selectedId);
                   router.replace('/');

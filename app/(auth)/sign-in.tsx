@@ -15,11 +15,13 @@ import { AntDesign, FontAwesome, Ionicons } from "@expo/vector-icons";
 import { usePostHog } from "posthog-react-native";
 import { images } from "@/constants/images";
 import { useSocialAuth } from "@/lib/useSocialAuth";
+import { useLanguageStore } from "@/store/languageStore";
 
 export default function SignInScreen() {
   const { signIn, fetchStatus } = useSignIn();
   const { onSocialPress, pending: socialPending } = useSocialAuth();
   const posthog = usePostHog();
+  const { selectedLanguageId } = useLanguageStore();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -48,8 +50,8 @@ export default function SignInScreen() {
       await signIn.finalize({
         navigate: ({ session }) => {
           posthog.capture('sign_in_completed', { method: 'email' });
-          posthog.identify(email, {
-            $set: { email },
+          posthog.identify(session?.userId ?? email, {
+            $set: { email, preferred_language: selectedLanguageId },
           });
           if (session?.currentTask) return;
           router.replace("/" as Href);

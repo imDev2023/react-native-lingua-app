@@ -1,6 +1,10 @@
+import { useEffect, useRef, useState } from "react";
+import { usePostHog } from "posthog-react-native";
 import {
   ActivityIndicator,
+  Animated,
   Image,
+  Pressable,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -12,11 +16,13 @@ import { Ionicons } from "@expo/vector-icons";
 import {
   StreamVideo,
   StreamCall,
+  callManager,
 } from "@stream-io/video-react-native-sdk";
 import { getLessonById } from "@/data/lessons";
 import { images } from "@/constants/images";
 import { useAudioCall, useMicControls, type CallStatus, type AgentStatus } from "@/hooks/useAudioCall";
 import { useLanguageStore } from "@/store/languageStore";
+import { LiveCaptions } from "@/components/LiveCaptions";
 
 const SESSION_STATS = [
   { label: "Speaking", value: "Excellent", color: "#21C16B" },
@@ -69,23 +75,109 @@ function StatusBadge({ status }: { status: CallStatus }) {
 }
 
 // Must render inside <StreamCall> so useCallStateHooks resolves correctly
-function MicButton() {
-  const { isMute, toggleMic } = useMicControls();
+function PushToTalkButton() {
+  const { enableMic, disableMic } = useMicControls();
+  const [isListening, setIsListening] = useState(false);
+
+  const scale = useRef(new Animated.Value(1)).current;
+  const ringScale = useRef(new Animated.Value(1)).current;
+  const ringOpacity = useRef(new Animated.Value(0)).current;
+
+  const isMountedRef = useRef(true);
+  const pressIdRef = useRef(0);
+  const isListeningRef = useRef(false);
+  const disableMicRef = useRef(disableMic);
+  useEffect(() => { disableMicRef.current = disableMic; }, [disableMic]);
+  useEffect(() => { isListeningRef.current = isListening; }, [isListening]);
+
+  // Unmount cleanup: restore mic and speaker if released while listening
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+      if (isListeningRef.current) {
+        disableMicRef.current().catch(() => {});
+        callManager.speaker.setMute(false);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isListening) return;
+    ringScale.setValue(1);
+    ringOpacity.setValue(0.45);
+    const pulse = Animated.loop(
+      Animated.parallel([
+        Animated.timing(ringScale, { toValue: 1.65, duration: 900, useNativeDriver: true }),
+        Animated.timing(ringOpacity, { toValue: 0, duration: 900, useNativeDriver: true }),
+      ])
+    );
+    pulse.start();
+    return () => {
+      pulse.stop();
+      ringScale.setValue(1);
+      ringOpacity.setValue(0);
+    };
+  }, [isListening]);
+
+  async function handlePressIn() {
+    const pressId = ++pressIdRef.current;
+    callManager.speaker.setMute(true);
+    setIsListening(true);
+    Animated.spring(scale, { toValue: 1.1, useNativeDriver: true, friction: 5 }).start();
+    try {
+      await enableMic();
+      // press-out fired while enableMic was in-flight — undo the enable
+      if (pressIdRef.current !== pressId) {
+        disableMicRef.current().catch(() => {});
+      }
+    } catch {
+      if (isMountedRef.current) {
+        setIsListening(false);
+        callManager.speaker.setMute(false);
+      }
+    }
+  }
+
+  async function handlePressOut() {
+    pressIdRef.current++; // invalidate any in-flight pressIn
+    if (isMountedRef.current) {
+      setIsListening(false);
+      Animated.spring(scale, { toValue: 1, useNativeDriver: true, friction: 5 }).start();
+    }
+    try {
+      await disableMic();
+    } catch {
+      // best-effort; finally still restores speaker
+    } finally {
+      callManager.speaker.setMute(false);
+    }
+  }
+
   return (
-    <View style={styles.controlItem}>
-      <TouchableOpacity
-        onPress={toggleMic}
-        style={[styles.controlBtn, isMute ? styles.controlBtnRed : styles.controlBtnGray]}
-        activeOpacity={0.7}
-      >
-        <Ionicons
-          name={isMute ? "mic-off-outline" : "mic-outline"}
-          size={24}
-          color={isMute ? "white" : "#374151"}
+    <View style={styles.pttContainer}>
+      <View style={styles.pttRingWrapper}>
+        <Animated.View
+          style={[styles.pttRing, { transform: [{ scale: ringScale }], opacity: ringOpacity }]}
         />
-      </TouchableOpacity>
-      <Text className="font-poppins-regular text-[12px] text-text-secondary">
-        {isMute ? "Muted" : "Mic"}
+        <Animated.View style={{ transform: [{ scale }] }}>
+          <Pressable
+            onPressIn={handlePressIn}
+            onPressOut={handlePressOut}
+            style={[styles.pttButton, isListening && styles.pttButtonActive]}
+          >
+            <Ionicons
+              name={isListening ? "mic" : "mic-outline"}
+              size={36}
+              color={isListening ? "white" : "#374151"}
+            />
+          </Pressable>
+        </Animated.View>
+      </View>
+      <Text
+        className="font-poppins-semibold text-[14px]"
+        style={[styles.pttLabel, isListening && styles.pttLabelActive]}
+      >
+        {isListening ? "Listening…" : "Hold to speak"}
       </Text>
     </View>
   );
@@ -96,11 +188,50 @@ export default function LessonScreen() {
   const router = useRouter();
   const lesson = getLessonById(id);
   const { selectedLanguageId } = useLanguageStore();
+  const posthog = usePostHog();
 
   const { call, client, status, error, agentStatus, startCall, endCall, retryCall } = useAudioCall({
     lessonId: id,
     languageId: selectedLanguageId ?? lesson?.languageId ?? "en",
   });
+
+  const startTimeRef = useRef<number | null>(null);
+  const lessonStartedRef = useRef(false);
+  const statusRef = useRef(status);
+  useEffect(() => { statusRef.current = status; }, [status]);
+
+  // Fire lesson_started only after a successful join, not on button press,
+  // so a failed connection doesn't produce a false lesson_started/abandoned pair.
+  useEffect(() => {
+    if (status === "joined" && !lessonStartedRef.current) {
+      startTimeRef.current = Date.now();
+      lessonStartedRef.current = true;
+      posthog.capture("lesson_started", {
+        lesson_id: id,
+        language: selectedLanguageId ?? lesson?.languageId ?? "en",
+        lesson_number: lesson?.order ?? 1,
+      });
+    }
+  }, [status]);
+
+  useEffect(() => {
+    return () => {
+      if (lessonStartedRef.current && statusRef.current !== "ended") {
+        const elapsed = startTimeRef.current
+          ? Math.floor((Date.now() - startTimeRef.current) / 1000)
+          : 0;
+        posthog.capture("lesson_abandoned", {
+          lesson_id: id,
+          time_into_lesson_seconds: elapsed,
+          last_question_index: 0,
+        });
+      }
+    };
+  }, []);
+
+  function handleStartLesson() {
+    startCall();
+  }
 
   const greeting = lesson?.aiTeacher?.greeting ?? "Hello! Let's practice together!";
   const shortGreeting = extractShortGreeting(greeting);
@@ -153,13 +284,22 @@ export default function LessonScreen() {
 
         <View style={styles.headerRight}>
           <View style={styles.xpBadge}>
-            <Ionicons name="videocam-outline" size={14} color="#6C4EF5" />
+            <Ionicons name="star-outline" size={14} color="#6C4EF5" />
             <Text className="font-poppins-semibold text-[13px] text-lingua-purple">
-              {lesson?.xpReward ?? 12}
+              {lesson?.xpReward ?? 12} XP
             </Text>
           </View>
-          <TouchableOpacity activeOpacity={0.7}>
-            <Ionicons name="notifications-outline" size={24} color="#001328" />
+          <TouchableOpacity
+            onPress={handleEndCall}
+            style={styles.endCallBtn}
+            activeOpacity={0.8}
+          >
+            <Ionicons
+              name="call"
+              size={18}
+              color="white"
+              style={{ transform: [{ rotate: "135deg" }] }}
+            />
           </TouchableOpacity>
         </View>
       </View>
@@ -223,6 +363,9 @@ export default function LessonScreen() {
           </View>
         )}
 
+        {/* Live Captions — shown for both AI teacher and user speech */}
+        {isJoined && call && <LiveCaptions />}
+
         {/* Speech Bubble */}
         <View style={styles.speechBubble}>
           <View style={styles.speechBubbleInner}>
@@ -244,77 +387,18 @@ export default function LessonScreen() {
         </View>
       </View>
 
-      {/* Call Controls */}
-      <View style={styles.controlsCard}>
-        <View style={styles.controlsRow}>
-          {/* Camera — always disabled for audio-only */}
-          <View style={styles.controlItem}>
-            <View style={[styles.controlBtn, styles.controlBtnGray]}>
-              <Ionicons name="videocam-off-outline" size={24} color="#9CA3AF" />
-            </View>
-            <Text className="font-poppins-regular text-[12px] text-[#9CA3AF]">
-              Camera
+      {/* Controls */}
+      <View style={styles.controlsArea}>
+        {isIdle ? (
+          <TouchableOpacity style={styles.startBtn} onPress={handleStartLesson} activeOpacity={0.8}>
+            <Ionicons name="play" size={20} color="white" />
+            <Text className="font-poppins-bold text-[16px]" style={{ color: "white" }}>
+              Start Lesson
             </Text>
-          </View>
-
-          {/* Mic — live mute toggle when joined, static otherwise */}
-          {isJoined && call ? (
-            <MicButton />
-          ) : (
-            <View style={styles.controlItem}>
-              <View style={[styles.controlBtn, styles.controlBtnGray]}>
-                <Ionicons name="mic-outline" size={24} color="#9CA3AF" />
-              </View>
-              <Text className="font-poppins-regular text-[12px] text-[#9CA3AF]">
-                Mic
-              </Text>
-            </View>
-          )}
-
-          {/* Start (idle) / Subtitles (active) */}
-          <View style={styles.controlItem}>
-            {status === "idle" ? (
-              <TouchableOpacity
-                style={[styles.controlBtn, styles.controlBtnPurple]}
-                onPress={startCall}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="play" size={22} color="white" />
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                style={[styles.controlBtn, styles.controlBtnGray]}
-                activeOpacity={0.7}
-              >
-                <Text className="font-poppins-bold text-[18px] text-[#374151]">
-                  Aa
-                </Text>
-              </TouchableOpacity>
-            )}
-            <Text className="font-poppins-regular text-[12px] text-text-secondary">
-              {status === "idle" ? "Start" : "Subtitles"}
-            </Text>
-          </View>
-
-          {/* End Call */}
-          <View style={styles.controlItem}>
-            <TouchableOpacity
-              onPress={handleEndCall}
-              style={[styles.controlBtn, styles.controlBtnRed]}
-              activeOpacity={0.8}
-            >
-              <Ionicons
-                name="call"
-                size={24}
-                color="white"
-                style={{ transform: [{ rotate: "135deg" }] }}
-              />
-            </TouchableOpacity>
-            <Text className="font-poppins-regular text-[12px] text-text-secondary">
-              End Call
-            </Text>
-          </View>
-        </View>
+          </TouchableOpacity>
+        ) : isJoined && call ? (
+          <PushToTalkButton />
+        ) : null}
       </View>
 
       {/* Session Stats */}
@@ -470,43 +554,76 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  controlsCard: {
-    marginHorizontal: 16,
-    marginBottom: 14,
-    backgroundColor: "white",
-    borderRadius: 28,
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  controlsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  controlItem: {
-    alignItems: "center",
-    gap: 8,
-  },
-  controlBtn: {
-    width: 62,
-    height: 62,
-    borderRadius: 31,
+  endCallBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "#EF4444",
     alignItems: "center",
     justifyContent: "center",
   },
-  controlBtnGray: {
-    backgroundColor: "#F3F4F6",
+  controlsArea: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 22,
+    marginBottom: 8,
   },
-  controlBtnRed: {
-    backgroundColor: "#EF4444",
-  },
-  controlBtnPurple: {
+  startBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
     backgroundColor: "#6C4EF5",
+    paddingHorizontal: 36,
+    paddingVertical: 16,
+    borderRadius: 999,
+    shadowColor: "#6C4EF5",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  pttContainer: {
+    alignItems: "center",
+  },
+  pttRingWrapper: {
+    width: 90,
+    height: 90,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pttRing: {
+    position: "absolute",
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: "#6C4EF5",
+  },
+  pttButton: {
+    width: 86,
+    height: 86,
+    borderRadius: 43,
+    backgroundColor: "#F3F4F6",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  pttButtonActive: {
+    backgroundColor: "#6C4EF5",
+    shadowColor: "#6C4EF5",
+    shadowOpacity: 0.45,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  pttLabel: {
+    marginTop: 14,
+    color: "#9CA3AF",
+  },
+  pttLabelActive: {
+    color: "#6C4EF5",
   },
   statsRow: {
     flexDirection: "row",

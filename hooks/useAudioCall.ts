@@ -118,6 +118,24 @@ export function useAudioCall({ lessonId, languageId }: UseAudioCallOptions) {
       await streamCall.join({ create: true });
       setStatus("joined");
 
+      // Start muted so push-to-talk is the default; fail closed if this errors
+      try {
+        await streamCall.microphone.disable();
+      } catch (micErr) {
+        // No alternative mute API exists — disable() is the only primitive.
+        // Treat as fatal: mic state is unknown, PTT would be unsafe to show.
+        console.warn(
+          "[useAudioCall] microphone.disable() failed on join:",
+          micErr instanceof Error ? micErr.message : micErr
+        );
+        setError("Could not initialize push-to-talk. Please retry.");
+        setStatus("error");
+        return;
+      }
+
+      // Enable live captions for both user and AI teacher speech
+      try { await streamCall.startClosedCaptions({ language: "en" }); } catch {}
+
       // Start AI teacher in the background — don't block the user's audio session
       startAgent();
     } catch (err) {
@@ -179,5 +197,13 @@ export function useMicControls() {
     await microphone.toggle();
   }
 
-  return { isMute: optimisticIsMute ?? isMute, toggleMic };
+  async function enableMic() {
+    await microphone.enable();
+  }
+
+  async function disableMic() {
+    await microphone.disable();
+  }
+
+  return { isMute: optimisticIsMute ?? isMute, toggleMic, enableMic, disableMic };
 }

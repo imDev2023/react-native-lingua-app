@@ -51,6 +51,12 @@ export async function POST(request: Request) {
   await call.getOrCreate({
     data: {
       created_by_id: userId,
+      settings_override: {
+        transcription: {
+          mode: "available",
+          closed_caption_mode: "available",
+        },
+      },
       custom: {
         lessonId,
         languageId,
